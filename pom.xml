@@ -34,7 +34,7 @@
                     <archive>
                         <manifest>
                             <!-- Указываем главный класс для запуска -->
-                            <mainClass>com.university.bot.Main</mainClass>
+                            <mainClass>com.project.bot.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>
