@@ -1,4 +1,4 @@
-package org.project.bot.botMapPointList;
+package com.project.bot.botMapPointList;
 
 public class AllMapPoint {
 }
