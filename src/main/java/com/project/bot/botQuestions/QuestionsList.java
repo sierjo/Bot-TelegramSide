@@ -41,11 +41,6 @@ public class QuestionsList extends TelegramLongPollingBot {
         public String getFirstMessage() {
             return firstMessage;
         }
-
-        public void setFirstMessage(String firstMessage) {
-            this.firstMessage = firstMessage;
-        }
-
     }
 
     @Override
@@ -84,12 +79,15 @@ public class QuestionsList extends TelegramLongPollingBot {
 
             //  Получаем или создаем состояние пользователя
             UserState userState = userStates.getOrDefault(chatId, new UserState());
+            System.out.println("It's states " + userState.getState());     // Проверка
+//            System.out.println("It's message " + text);                   // Проверка
             SendMessage sendMessage = new SendMessage();
             sendMessage.setChatId(chatId);
 
             // Обработка команды /restart
             if (text.equals("/restart")) {
-                System.out.println(allMapPoint.allMapPoint());
+                allMapPoint.clearMapPoint();
+                allMapPoint.setPointCounter(0);
                 userStates.remove(chatId); // Сбрасываем состояние пользователя
                 setPoints(chatId);
                 userStates.put(chatId, userState); // Сохранение состояния
@@ -104,15 +102,16 @@ public class QuestionsList extends TelegramLongPollingBot {
             switch (userState.getState()) {
                 case 0: // первое сообщение
                     if (text.equals("/start")) {
+                        // Строим маршрут?
                         setPoints(chatId);
                         userState.setState(1);
-                        userStates.put(chatId, userState);
-                        // Строим маршрут?
+                        System.out.println("CASE 0");
                     } else {
                         sendMessage.setText("Enter the command: /start");
                     }
                     break;
-                case 1:
+                case 1: // Все точки указаны?
+//                    System.out.println("Sige map point " + allQuestion.allMapPoint().size());
                     allMapPoint.addMapPoint(pointText);
                     Continue_Indicate_Points(chatId);
                     System.out.println("Continue state " + userState.getState());
@@ -121,12 +120,57 @@ public class QuestionsList extends TelegramLongPollingBot {
                     System.out.println("getNumberMapPoint " + allMapPoint.getNumberMapPoint());
                     System.out.println("getPointCounter" + allMapPoint.getPointCounter());
                     break;
+                case 2:
+                    if (userState.getFirstMessage() != " ") {
+                        text = userState.getFirstMessage();
+                        userState.setState(3);
+                        System.out.println("ISPOKNILSIA IF Case 2");
+                    }
+                    System.out.println("Содержимое ответа пользователя на CASE 2" + text);
+                    System.out.println("CASE 2");
+                    SendMessage sendidMessage = new SendMessage();
+                    sendidMessage.setChatId(chatId);
+                    String saveUserMessage = update.getMessage().getText();
+                    // Извлекаем номер точки из состояния
+                    // Обновляем точку в allQuestion
+                    allMapPoint.updateMapPoint(allMapPoint.getIndexMapPoint() - 1, saveUserMessage); // Нумерация точек начинается с 1, поэтому вычитаем 1
+                    // Подтверждаем изменение
+                    System.out.println("Zamena ticki " + saveUserMessage);
+                    sendidMessage.setText("Точка " + allMapPoint.getIndexMapPoint() + " успешно обновлена на: " + saveUserMessage);
+                    // Сбрасываем состояние
+                    try {
+                        execute(sendidMessage);
+                    } catch (TelegramApiException e) {
+                        e.printStackTrace();
+                    }
+                    checkingAllPoints(Long.parseLong(chatId));
+                    userStates.remove(chatId); // Сбрасываем сост пользователя
+                    userState.setState(1);
+                    userStates.put(chatId, userState); // Сохранение состояния
+                    break;
+                case 3:
+                    checkingAllPoints(Long.parseLong(chatId));
+                    userStates.remove(chatId); // Сбрасываем сост пользователя
+                    userState.setState(1);
+                    userStates.put(chatId, userState); // Сохранение состояния
+                    System.out.println("CASE 3");
+                    break;
                 default:
                     sendMessage.setText("Enter the command: /restart");
                     userStates.remove(chatId);
                     break;
             }
+
+//            Сохраняем состояние пользователя
+            userStates.put(chatId, userState);
+
+            try {
+                this.execute(sendMessage);
+            } catch (TelegramApiException e) {
+                throw new RuntimeException(e);
+            }
         }
+
         if (update.hasCallbackQuery()) {
 
             String callbackData = update.getCallbackQuery().getData();
@@ -138,6 +182,7 @@ public class QuestionsList extends TelegramLongPollingBot {
             UserState userState = userStates.getOrDefault(chatId, new UserState());
 
             EditMessageText editMessageText = new EditMessageText();
+            EditMessageReplyMarkup editMarkup = new EditMessageReplyMarkup();
 
             if (callbackData.equals("Agree_To_Set_Point")) {
                 System.out.println(messageId);
@@ -161,7 +206,18 @@ public class QuestionsList extends TelegramLongPollingBot {
                     e.printStackTrace();
                 }
             } else if (callbackData.equals("Agree")) {
-                System.out.println("Your points: " + "\n" + allMapPoint.allMapPoint());
+                checkingAllPoints(chatId);
+
+                editMessageText.setChatId(chatId);
+                editMessageText.setMessageId(Math.toIntExact(messageId));
+//                editMessageText.setText("Точки указаны верно?");
+                editMessageText.setText("Are the points indicated correctly?");
+                try {
+                    execute(editMessageText);
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                }
+
             } else if (callbackData.equals("No_Agree")) {
                 allMapPoint.point_is_added();
                 allMapPoint.incrementCounter();
@@ -169,6 +225,61 @@ public class QuestionsList extends TelegramLongPollingBot {
                 editMessageText.setMessageId(Math.toIntExact(messageId)); // Указываем ID сообщения, чтобы его отредактировать
 //                editMessageText.setText("Укажите адрес точки № " + allQuestion.getPointCounter());
                 editMessageText.setText("Specify the address of point № " + allMapPoint.getPointCounter());
+                try {
+                    execute(editMessageText);
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                }
+            } else if (callbackData.equals("Agree_Сhecking")) {
+                messageId--;
+                editMessageText.setChatId(chatId);
+                editMessageText.setMessageId(Math.toIntExact(messageId)); // Указываем ID сообщения, чтобы его отредактировать
+//                editMessageText.setText("Ваши точки:" + "\n");
+                editMessageText.setText("Your points:" + "\n");
+                try {
+                    execute(editMessageText);
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                }
+                messageId++;
+                editMarkup.setChatId(chatId);
+                editMarkup.setMessageId(Math.toIntExact(messageId));
+                editMarkup.setReplyMarkup(null); // Убираем кнопки полностью
+                try {
+                    execute(editMarkup);
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                }
+            } else if (callbackData.equals("No_Agree_Сhecking")) {
+                editPoint(chatId);
+            } else if (callbackData.startsWith("Point_")) {
+
+                allMapPoint.setIndexMapPoint(Integer.parseInt(callbackData.split("_")[1]));
+
+                // Логируем выбранную точку
+                System.out.println("Пользователь выбрал точку: " + allMapPoint.getIndexMapPoint());
+
+                // Запрашиваем новый адрес для этой точки
+                SendMessage message = new SendMessage();
+                message.setChatId(chatId);
+                message.setText("Вы выбрали Точку " + allMapPoint.getIndexMapPoint() + ". Введите новый адрес:");
+
+                userState.setState(2);
+                userStates.put(String.valueOf(chatId), userState); // Сохранение состояния
+                System.out.println("It's states 1 posle KNOPKI TOCHKA " + userState.getState());
+                try {
+                    execute(message);
+                } catch (TelegramApiException e) {
+                    e.printStackTrace();
+                }
+            }
+            if (userState.getState() == 3) {
+
+
+                messageId--;
+                editMessageText.setChatId(chatId);
+                editMessageText.setMessageId(Math.toIntExact(messageId)); // Указываем ID сообщения, чтобы его отредактировать
+                editMessageText.setText("Are the points indicated correctly?");
                 try {
                     execute(editMessageText);
                 } catch (TelegramApiException e) {
@@ -228,6 +339,67 @@ public class QuestionsList extends TelegramLongPollingBot {
         rowInline.add(noButton);
 
         rowsInline.add(rowInline);
+
+        markupInline.setKeyboard(rowsInline);
+
+        message.setReplyMarkup(markupInline);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void checkingAllPoints(long chatId) {
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        message.setText("\n" + allMapPoint.allMapPoint());
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+        List<InlineKeyboardButton> rowInline = new ArrayList<>();
+        var yesButton = new InlineKeyboardButton();
+        yesButton.setText("Yes");
+        yesButton.setCallbackData("Agree_Сhecking");       // Модификатор позволяющий боту понять какая кнопка была нажата
+        var noButton = new InlineKeyboardButton();
+        noButton.setText("No");
+        noButton.setCallbackData("No_Agree_Сhecking");       // Модификатор позволяющий боту понять какая кнопка была нажата
+
+        rowInline.add(yesButton);
+        rowInline.add(noButton);
+
+        rowsInline.add(rowInline);
+
+        markupInline.setKeyboard(rowsInline);
+
+        message.setReplyMarkup(markupInline);
+
+        try {
+            execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void editPoint(long chatId) {
+        ;
+        SendMessage message = new SendMessage();
+        message.setChatId(chatId);
+        message.setText("Какую точку нужно отредактировать?");
+
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+
+        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+        System.out.println("getPointCounter " + allMapPoint.getPointCounter());
+        System.out.println("getAllMapPoint " + allMapPoint.getNumberMapPoint());
+        for (int i = 1; i <= allMapPoint.getPointCounter(); i++) {
+            List<InlineKeyboardButton> rowInline = new ArrayList<>();
+            InlineKeyboardButton editPointButton = new InlineKeyboardButton();
+            editPointButton.setText("Point " + i);
+            editPointButton.setCallbackData("Point_" + i);
+            rowInline.add(editPointButton);
+            rowsInline.add(rowInline);
+        }
 
         markupInline.setKeyboard(rowsInline);
 
