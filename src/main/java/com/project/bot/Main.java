@@ -1,5 +1,6 @@
 package com.project.bot;
 
+import com.project.bot.botMapPointList.AllMapPoint;
 import com.project.bot.botQuestions.QuestionsList;
 
 import org.telegram.telegrambots.meta.TelegramBotsApi;
@@ -20,5 +21,10 @@ public class Main {
         } catch (TelegramApiException e) {
             throw new RuntimeException(e);
         }
+        AllMapPoint allMapPoint = new AllMapPoint();
+        allMapPoint.addMapPoint("1111");
+        allMapPoint.addMapPoint("2222");
+        allMapPoint.addMapPoint("3333");
+        System.out.println(allMapPoint.allMapPoint());
     }
 }
